@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -22,45 +22,46 @@ using File = System.IO.File;
 
 namespace SpotDown_V2
 {
-    /// <summary>
-    /// Please give credit to me if you use this or any part of it.
-    /// HF: http://www.hackforums.net/member.php?action=profile&uid=1389752
-    /// GitHub: https://github.com/DarkN3ss61
-    /// Website: http://jlynx.net/
-    /// Twitter: https://twitter.com/jLynx_DarkN3ss
-    /// </summary>
+    /*
+    Please give credit to me if you use this or any part of it.
+    
+    HF: http://www.hackforums.net/member.php?action=profile&uid=1389752
+    GitHub: https://github.com/DarkN3ss61
+    Website: http://jlynx.net/
+    Twitter: https://twitter.com/jLynx_DarkN3ss
 
-    //ToDo
-    //-Fix this mess of code.
-    //-Does not always start downloading first time. Restart program and try again.
-    //-Progress bar can be glitchy.
+    ToDo
+    - Fix this mess of code.
+    - Does not always start downloading first time. Restart program and try again.
+    - Progress bar can be glitchy.
+    */
 
     public partial class MainForm : Form
     {
         private const string ApiKey = "{Enter Your YouTube Key Here}";
-        string _dir = "songs/";
-        string _tempDir = "songs/temp/";
-        int maxRunning = 10;
-        int _running = 0;
-        int _songs = 0;
-        int _youtubeNum = 0;
-        int _youtubeDownloadedNum = 0;
-        int _mp3ClanNum = 0;
-        int _mp3ClanDownloadedNum = 0;
-        int _totalQuedNum = 0;
-        int _totalFinished = 0;
-        int _current = 0;
-        bool _debug = false;
-        string _ffmpegPath;
+        private string Dir = "songs/";
+        private string TempDir = "songs/temp/";
+        private const int MaxRunning = 10;
+        private int Running;
+        private int Songs;
+        private int YoutubeNum;
+        private int YoutubeDownloadedNum;
+        private int Mp3ClanNum;
+        private int Mp3ClanDownloadedNum;
+        private int TotalQuedNum;
+        private int TotalFinished;
+        private int Current;
+        private bool Debug;
+        private string FfmpegPath;
 
-        ListViewData[] downloadData = new ListViewData[10000];
-        private int[] songsArray = new int[10000];
-        private PassArguments[][] songArray = new PassArguments[10000][];
+        private readonly ListViewData[] DownloadData = new ListViewData[10000];
+        private readonly int[] SongsArray = new int[10000];
+        private readonly PassArguments[][] SongArray = new PassArguments[10000][];
 
         private const string Website = @"http://jlynx.net/download/spotdown/SpotDown.exe";
-        private readonly string _spotDownUa = "SpotDown " + Assembly.GetExecutingAssembly().GetName().Version + " " + Environment.OSVersion;
+        //private readonly string SpotDownUa = "SpotDown " + Assembly.GetExecutingAssembly().GetName().Version + " " + Environment.OSVersion;
 
-        YouTubeDownloader youTubeDownloader = new YouTubeDownloader();
+        private readonly YouTubeDownloader YouTubeDownloader = new YouTubeDownloader();
 
         public MainForm()
         {
@@ -73,35 +74,28 @@ namespace SpotDown_V2
 
             SetupFfmpeg();
             SetupDir();
-            
+
             Log("Started");
         }
 
-        void SetupDir()
+        private void SetupDir()
         {
-            if (Settings.Default.SaveDir.Length < 1)
-            {
-                downloadDirTextBox.Text = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            }
-            else
-            {
-                downloadDirTextBox.Text = Settings.Default.SaveDir;
-            }
-            _dir = downloadDirTextBox.Text + "/";
-            _tempDir = _dir + "temp/";
-            if (!Directory.Exists(_tempDir))
-            {
-                DirectoryInfo di = Directory.CreateDirectory(_tempDir);
-                di.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
-            }
+            downloadDirTextBox.Text = Settings.Default.SaveDir.Length < 1
+                ? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                : Settings.Default.SaveDir;
+            Dir = downloadDirTextBox.Text + "/";
+            TempDir = Dir + "temp/";
+            if (Directory.Exists(TempDir)) return;
+            DirectoryInfo Di = Directory.CreateDirectory(TempDir);
+            Di.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
         }
 
-        void SetupFfmpeg()
+        private void SetupFfmpeg()
         {
             try
             {
-                _ffmpegPath = Path.Combine(Path.GetTempPath(), "ffmpeg.exe");
-                File.WriteAllBytes(_ffmpegPath, Resources.ffmpeg);
+                FfmpegPath = Path.Combine(Path.GetTempPath(), "ffmpeg.exe");
+                File.WriteAllBytes(FfmpegPath, Resources.ffmpeg);
             }
             catch (Exception)
             {
@@ -109,348 +103,328 @@ namespace SpotDown_V2
             }
         }
 
-        public void Log(string text, bool debugLog = false)
+        public void Log(string text, bool DebugLog = false)
         {
             const string logFormat = "[{0}] >> {1}\n";
 
             if (string.IsNullOrWhiteSpace(text))
                 throw new ArgumentException("Log text can not be empty!");
 
-            var logText = text;
-            if (debugLog && _debug)
+            var LogText = text;
+            if (DebugLog && Debug)
             {
-                textBox1.AppendText(string.Format(logFormat, DateTime.Now.ToLongTimeString(), logText));
+                textBox1.AppendText(string.Format(logFormat, DateTime.Now.ToLongTimeString(), LogText));
             }
-            else if (debugLog == false)
+            else if (DebugLog == false)
             {
-                textBox1.AppendText(string.Format(logFormat, DateTime.Now.ToLongTimeString(), logText));
+                textBox1.AppendText(string.Format(logFormat, DateTime.Now.ToLongTimeString(), LogText));
             }
         }
 
         private void CheckUpdate()
         {
-            WebClient wc = new WebClient();
-            int latest = 0;
+            WebClient Wc = new WebClient();
+            int Latest = 0;
             try
             {
-                latest = Convert.ToInt32(wc.DownloadString("http://jlynx.net/download/spotdown/version.txt"));
+                Latest = Convert.ToInt32(Wc.DownloadString("http://jlynx.net/download/spotdown/version.txt"));
             }
-            catch (WebException ex)
+            catch (WebException)
             {
                 Log("Could not reach update server.");
             }
-            
-            int currentVersion = Convert.ToInt32(Application.ProductVersion.Replace(".", ""));
-            labelVersion.Text = "Version: " + Assembly.GetExecutingAssembly().GetName().Version;
-            if (currentVersion < latest )
-            {
-                if (
-                    MessageBox.Show("There is a newer version of SpotDown available. Would you like to upgrade?",
-                        "SpotDown", MessageBoxButtons.YesNo) == DialogResult.Yes)
-                {
-                    Process.Start(Website);
-                    Application.Exit();
-                }
-            }
+
+            int CurrentVersion = Convert.ToInt32(Application.ProductVersion.Replace(".", ""));
+            labelVersion.Text = @"Version: " + Assembly.GetExecutingAssembly().GetName().Version;
+            if (CurrentVersion >= Latest) return;
+            if (
+                MessageBox.Show(@"There is a newer version of SpotDown available. Would you like to upgrade?",
+                    @"SpotDown", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            Process.Start(Website);
+            Application.Exit();
         }
 
-        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        private void MainForm_FormClosing(object Sender, FormClosingEventArgs E)
         {
-            if (_running != 0)
+            DialogResult DialogResult =
+                MessageBox.Show(@"Are you sure you want to quit? Some songs are sill being downloaded.",
+                    @"Are you sure?", MessageBoxButtons.YesNo);
+            if (Running != 0)
             {
-                DialogResult dialogResult = MessageBox.Show("Are you sure you want to quit? Some songs are sill being downloaded.", "Are you sure?", MessageBoxButtons.YesNo);
-                if (dialogResult == DialogResult.Yes)
+                switch (DialogResult)
                 {
-                    Process.GetCurrentProcess().Kill();
-                }
-                else if (dialogResult == DialogResult.No)
-                {
-                    e.Cancel = true;
+                    case DialogResult.Yes:
+                        Process.GetCurrentProcess().Kill();
+                        break;
+                    case DialogResult.No:
+                        E.Cancel = true;
+                        break;
                 }
             }
             else
             {
-                if (Directory.Exists(_tempDir))
+                if (Directory.Exists(TempDir))
                 {
-                    Directory.Delete(_tempDir, true);
+                    Directory.Delete(TempDir, true);
                 }
             }
             try
             {
-                File.Delete(_ffmpegPath);
+                File.Delete(FfmpegPath);
             }
             catch (Exception)
             {
             }
         }
 
-        private void DownloadDirTextBox_TextChanged(object sender, EventArgs e)
+        private void DownloadDirTextBox_TextChanged(object Sender, EventArgs E)
         {
-            _dir = downloadDirTextBox.Text + "/";
-            _tempDir = _dir + "temp/";
-            if (!Directory.Exists(_tempDir))
+            Dir = downloadDirTextBox.Text + "/";
+            TempDir = Dir + "temp/";
+            if (Directory.Exists(TempDir)) return;
+            DirectoryInfo Di = Directory.CreateDirectory(TempDir);
+            Di.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
+        }
+
+        private void SongListView_ItemSelectionChanged(object Sender, ListViewItemSelectionChangedEventArgs E)
+        {
+            if (E.IsSelected)
+                E.Item.Selected = false;
+        }
+
+        private void SongListView_DragEnter(object Sender, DragEventArgs E)
+        {
+            if (E.Data.GetDataPresent(DataFormats.StringFormat))
             {
-                DirectoryInfo di = Directory.CreateDirectory(_tempDir);
-                di.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
+                E.Effect = DragDropEffects.Copy;
             }
         }
 
-        private void SongListView_ItemSelectionChanged(object sender, ListViewItemSelectionChangedEventArgs e)
-        {
-            if (e.IsSelected)
-                e.Item.Selected = false;
-        }
-
-        private void SongListView_DragEnter(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(DataFormats.StringFormat))
-            {
-                e.Effect = DragDropEffects.Copy;
-            }
-        }
-
-        private void SongListView_DragDrop(object sender, DragEventArgs e)
+        private void SongListView_DragDrop(object Sender, DragEventArgs E)
         {
             try
             {
-                if (e.Data.GetDataPresent(DataFormats.StringFormat))
+                if (!E.Data.GetDataPresent(DataFormats.StringFormat)) return;
+                Current++;
+                SongArray[Current] = new PassArguments[10000];
+                string Data = (string) E.Data.GetData(DataFormats.StringFormat);
+                Data = Data.Replace("http://open.spotify.com/track/", "");
+                string[] StrArrays = Data.Split('\n');
+                Songs = Songs + StrArrays.Length;
+                SongsArray[Current] = StrArrays.Length;
+                Log("Loading " + StrArrays.Length + " songs...");
+                foreach (string Str in StrArrays)
                 {
-                    _current++;
-                    songArray[_current] = new PassArguments[10000];
-                    string data = (string)e.Data.GetData(DataFormats.StringFormat);
-                    data = data.Replace("http://open.spotify.com/track/", "");
-                    string[] strArrays = data.Split(new char[] { '\n' });
-                    _songs = _songs + strArrays.Length;
-                    songsArray[_current] = strArrays.Length;
-                    Log("Loading " + strArrays.Length + " songs...");
-                    foreach (string str in strArrays)
+                    if (Str.Length <= 1) continue;
+                    BackgroundWorker BackgroundWorkerStart = new BackgroundWorker();
+                    BackgroundWorkerStart.DoWork += BackgroundWorkerStart_DoWork;
+                    BackgroundWorkerStart.RunWorkerAsync(new PassArguments
                     {
-                        if (str.Length > 1)
-                        {
-                            BackgroundWorker backgroundWorkerStart = new BackgroundWorker();
-                            backgroundWorkerStart.DoWork += BackgroundWorkerStart_DoWork;
-                            backgroundWorkerStart.RunWorkerAsync(new PassArguments
-                            {
-                                PassedSpotCode = str,
-                                PassedSession = _current
-                            });
-                        }
-                    }
+                        PassedSpotCode = Str,
+                        PassedSession = Current
+                    });
                 }
             }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, ex.Source, MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception Ex)
+            {
+                MessageBox.Show(this, Ex.Message, Ex.Source, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        private void DownloadDirOpenButton_Click(object sender, EventArgs e)
+        private void DownloadDirOpenButton_Click(object Sender, EventArgs E)
         {
             Process.Start(downloadDirTextBox.Text);
         }
 
-        private void DownloadDirBrowseButton_Click(object sender, EventArgs e)
+        private void DownloadDirBrowseButton_Click(object Sender, EventArgs E)
         {
-            using (var fbd = new FolderBrowserDialog())
+            using (var Fbd = new FolderBrowserDialog())
             {
-                if (fbd.ShowDialog() == DialogResult.OK)
-                {
-                    var directory = fbd.SelectedPath;
+                if (Fbd.ShowDialog() != DialogResult.OK) return;
+                var Directory = Fbd.SelectedPath;
 
-                    downloadDirTextBox.Text = directory;
-                    Settings.Default["SaveDir"] = downloadDirTextBox.Text;
-                    Settings.Default.Save();
-                }
+                downloadDirTextBox.Text = Directory;
+                Settings.Default["SaveDir"] = downloadDirTextBox.Text;
+                Settings.Default.Save();
             }
         }
 
-        private void BackgroundWorkerStart_DoWork(object sender, DoWorkEventArgs e)
+        private void BackgroundWorkerStart_DoWork(object Sender, DoWorkEventArgs E)
         {
-            PassArguments result = (PassArguments)e.Argument;
-            e.Result = result;
+            PassArguments Result = (PassArguments) E.Argument;
+            E.Result = Result;
             newProgressBar1.CustomText = "Loading...";
-            SearchSpotify(result.PassedSpotCode, result.PassedSession);
+            SearchSpotify(Result.PassedSpotCode, Result.PassedSession);
         }
 
-        private void SearchSpotify(string code, int session)
+        private void SearchSpotify(string Code, int Session)
         {
-            int num = 0;
-            PassArguments spotifyName = GetSpotifyName(code);
-            bool add = true;
+            int Num = 0;
+            PassArguments SpotifyName = GetSpotifyName(Code);
+            bool Add = true;
 
-            foreach (PassArguments[] songArrayInArray in songArray)
+            foreach (var SongThing in from SongArrayInArray in SongArray
+                where SongArrayInArray != null
+                from SongThing in SongArrayInArray
+                where SongThing != null
+                where SongThing.PassedFileName.Equals(SpotifyName.PassedSong + " - " + SpotifyName.PassedArtist)
+                select SongThing)
             {
-                if (songArrayInArray != null)
-                {
-                    foreach (var songThing in songArrayInArray)
-                    {
-                        if (songThing != null)
-                        {
-                            if (songThing.PassedFileName.Equals(spotifyName.PassedSong + " - " + spotifyName.PassedArtist))
-                            {
-                                //File already in list
-                                _songs--;
-                                songsArray[_current]--;
-                                add = false;
-                                Log("[Attention] The song " + spotifyName.PassedSong + " - " + spotifyName.PassedArtist +
-                                    " was already added.");
-                            }
-                        }
-                    }
-                }
+                //File already in list
+                Songs--;
+                SongsArray[Current]--;
+                Add = false;
+                Log("[Attention] The song " + SpotifyName.PassedSong + " - " + SpotifyName.PassedArtist +
+                    " was already added.");
             }
-            if (File.Exists(_dir + EscapeFilename(spotifyName.PassedFileName) + ".mp3"))
+            if (File.Exists(Dir + EscapeFilename(SpotifyName.PassedFileName) + ".mp3"))
             {
                 //File already exsists/Downloaded
-                _songs--;
-                songsArray[_current]--;
-                add = false;
+                Songs--;
+                SongsArray[Current]--;
+                Add = false;
             }
 
             try
             {
-                if (add)
+                if (Add)
                 {
                     {
                         SongListView.BeginUpdate();
-                        string[] row = { "Waiting", spotifyName.PassedSong + " - " + spotifyName.PassedArtist };
-                        var listViewItem = new ListViewItem(row);
-                        listViewItem.ImageIndex = 1;
-                        SongListView.Items.Add(listViewItem);
+                        string[] Row = {"Waiting", SpotifyName.PassedSong + " - " + SpotifyName.PassedArtist};
+                        var ListViewItem = new ListViewItem(Row) {ImageIndex = 1};
+                        SongListView.Items.Add(ListViewItem);
                         SetLabelVisible(false);
-                        num = listViewItem.Index;
+                        Num = ListViewItem.Index;
                         SongListView.EndUpdate();
 
-                        songArray[session][num] = (new PassArguments
+                        SongArray[Session][Num] = (new PassArguments
                         {
-                            PassedSong = spotifyName.PassedSong,
-                            PassedArtist = spotifyName.PassedArtist,
-                            PassedNum = num,
-                            PassedFileName = spotifyName.PassedSong + " - " + spotifyName.PassedArtist,
-                            PassedAlbum = spotifyName.PassedAlbum,
-                            PassedAlbumId = spotifyName.PassedAlbumId,
-                            PassedLength = spotifyName.PassedLength,
-                            PassedLengthMs = spotifyName.PassedLengthMs,
-                            PassedimageURL = spotifyName.PassedimageURL
+                            PassedSong = SpotifyName.PassedSong,
+                            PassedArtist = SpotifyName.PassedArtist,
+                            PassedNum = Num,
+                            PassedFileName = SpotifyName.PassedSong + " - " + SpotifyName.PassedArtist,
+                            PassedAlbum = SpotifyName.PassedAlbum,
+                            PassedAlbumId = SpotifyName.PassedAlbumId,
+                            PassedLength = SpotifyName.PassedLength,
+                            PassedLengthMs = SpotifyName.PassedLengthMs,
+                            PassedimageURL = SpotifyName.PassedimageURL
                         });
                     }
                 }
 
 //                if (SongListView.Items.Count == songs)
-                int result = songArray[session].Count(s => s != null);
+                int Result = SongArray[Session].Count(S => S != null);
 //                Log(result + " | " + songsArray[current]);
-                if (result == songsArray[_current])
+                if (Result == SongsArray[Current])
                 {
-                    Log(songsArray[_current] + " songs added. Total songs: " + _songs);
-                    SearchSongArray(session);
+                    Log(SongsArray[Current] + " songs added. Total songs: " + Songs);
+                    SearchSongArray(Session);
                 }
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                Log("[Error: x1] " + ex.Message + Environment.NewLine + num, true);
+                Log("[Error: x1] " + Ex.Message + Environment.NewLine + Num, true);
             }
         }
 
-        public void SearchSongArray(int session)
+        public void SearchSongArray(int Session)
         {
-            foreach (PassArguments songInfo in songArray[session])
+            foreach (PassArguments SongInfo in SongArray[Session])
             {
-                if (songInfo != null)
+                if (SongInfo != null)
                 {
                     try
                     {
-                        DownloadMP3Clan(songInfo.PassedNum, session);
+                        DownloadMp3Clan(SongInfo.PassedNum, Session);
                     }
-                    catch (Exception ex)
+                    catch (Exception Ex)
                     {
-                        Log("[Error: x2] " + ex.Message + " " + songInfo.PassedNum + " | " + songInfo.PassedFileName, true);
+                        Log("[Error: x2] " + Ex.Message + " " + SongInfo.PassedNum + " | " + SongInfo.PassedFileName,
+                            true);
                     }
                 }
             }
             Log("All song platforms found.");
         }
 
-        public void DownloadMP3Clan(int num, int session)
+        public void DownloadMp3Clan(int Num, int Session)
         {
-            PassArguments result = songArray[session][num];
-            
-            EditList("Loading...", result.PassedFileName, result.PassedNum, 0);
+            PassArguments Result = SongArray[Session][Num];
 
-            int highestBitrateNum = 0;
-            Mp3ClanTrack highestBitrateTrack = null;
-            List<Mp3ClanTrack> tracks = null;
+            EditList("Loading...", Result.PassedFileName, Result.PassedNum, 0);
+
+            int HighestBitrateNum = 0;
+            Mp3ClanTrack HighestBitrateTrack = null;
 
             const string searchBaseUrl = "http://mp3clan.com/mp3_source.php?q={0}";
-            var searchUrl = new Uri(string.Format(searchBaseUrl, Uri.EscapeDataString(result.PassedSong)));
-            string pageSource = null;
+            var SearchUrl = new Uri(string.Format(searchBaseUrl, Uri.EscapeDataString(Result.PassedSong)));
+            string PageSource;
 
             while (true)
             {
                 try
                 {
-                    pageSource = new MyWebClient().DownloadString(searchUrl);
+                    PageSource = new MyWebClient().DownloadString(SearchUrl);
                     break;
                 }
-                catch (WebException e)
+                catch (WebException E)
                 {
-                    if (e.Status == WebExceptionStatus.ProtocolError)
+                    if (E.Status == WebExceptionStatus.ProtocolError)
                     {
-                        EditList("Queued", result.PassedFileName, result.PassedNum, 1); //In Que so when its less than 5 it will start 
-                        _youtubeNum++;
-                        _totalQuedNum++;
-                        var th = new Thread(unused => Search(num, session));
-                        th.Start();
+                        EditList("Queued", Result.PassedFileName, Result.PassedNum, 1);
+                            //In Que so when its less than 5 it will start 
+                        YoutubeNum++;
+                        TotalQuedNum++;
+                        var Th = new Thread(Unused => Search(Num, Session));
+                        Th.Start();
                         return;
                     }
-                    Log("[Error: x3] " + e.Message + " | " + result.PassedFileName, true);
+                    Log("[Error: x3] " + E.Message + " | " + Result.PassedFileName, true);
                 }
             }
-            
 
-            IEnumerable<Mp3ClanTrack> trackResult;
-            if (Mp3ClanTrack.TryParseFromSource(pageSource, out trackResult))
+
+            IEnumerable<Mp3ClanTrack> TrackResult;
+            if (Mp3ClanTrack.TryParseFromSource(PageSource, out TrackResult))
             {
-                tracks = trackResult.ToList();
-                foreach (var track in tracks)
+                var Tracks = TrackResult.ToList();
+                foreach (var Track in Tracks)
                 {
-                    if (track.Artist.ToLower().Trim().Contains(result.PassedArtist.ToLower()) &&
-                        track.Name.ToLower().Trim().Equals(result.PassedSong.ToLower()))
+                    if (!Track.Artist.ToLower().Trim().Contains(Result.PassedArtist.ToLower()) ||
+                        !Track.Name.ToLower().Trim().Equals(Result.PassedSong.ToLower())) continue;
+                    string BitrateString;
+                    int Attempts = 0;
+                    while (true)
                     {
-                        string bitrateString = null;
-                        int attempts = 0;
-                        while (true)
+                        try
                         {
-                            try
-                            {
-                                bitrateString = new MyWebClient().DownloadString("http://mp3clan.com/bitrate.php?tid=" + track.Mp3ClanUrl.Replace("http://mp3clan.com/app/get.php?mp3=", ""));
-                                break;
-                            }
-                            catch (Exception ex)
-                            {
-                                attempts++;
-                                if (attempts > 2)
-                                {
-                                    Log("[Infomation: x4] " + result.PassedFileName + " " + ex.Message);
-                                    bitrateString = "0 kbps";
-                                    break;
-                                }
-                            }
+                            BitrateString =
+                                new MyWebClient().DownloadString("http://mp3clan.com/bitrate.php?tid=" +
+                                                                 Track.Mp3ClanUrl.Replace(
+                                                                     "http://mp3clan.com/app/get.php?mp3=", ""));
+                            break;
                         }
-
-                        int bitrate = Int32.Parse(GetKbps(bitrateString));
-                        if (bitrate >= 192)
+                        catch (Exception Ex)
                         {
-                            if (bitrate > highestBitrateNum)
-                            {
-                                double persentage = (GetLength(bitrateString) / result.PassedLength) * 100;
-//                                double durationMS = TimeSpan.FromMinutes(getLength(bitrateString)).TotalMilliseconds;
-//                                double persentage = (durationMS/result.passedLengthMS)*100;
-                                if (persentage >= 85 && persentage <= 115)
-                                {
-//                                    Log("Length acc: " + string.Format("{0:0.00}", persentage) + "%");
-                                    highestBitrateNum = bitrate;
-                                    highestBitrateTrack = track;
-                                }
-                            }
+                            Attempts++;
+                            if (Attempts <= 2) continue;
+                            Log("[Infomation: x4] " + Result.PassedFileName + " " + Ex.Message);
+                            BitrateString = "0 kbps";
+                            break;
                         }
                     }
+
+                    int Bitrate = Int32.Parse(GetKbps(BitrateString));
+                    if (Bitrate < 192) continue;
+                    if (Bitrate <= HighestBitrateNum) continue;
+                    double Persentage = (GetLength(BitrateString)/Result.PassedLength)*100;
+//                                double durationMS = TimeSpan.FromMinutes(getLength(bitrateString)).TotalMilliseconds;
+//                                double persentage = (durationMS/result.passedLengthMS)*100;
+                    if (!(Persentage >= 85) || !(Persentage <= 115)) continue;
+//                                    Log("Length acc: " + string.Format("{0:0.00}", persentage) + "%");
+                    HighestBitrateNum = Bitrate;
+                    HighestBitrateTrack = Track;
                 }
             }
             //=======For testing================
@@ -461,400 +435,401 @@ namespace SpotDown_V2
 //            th.Start();
             //==================================
 
-            if (highestBitrateTrack == null)
-            {//Youtube
-                EditList("Queued", result.PassedFileName, result.PassedNum, 1);
-                _youtubeNum++;
-                _totalQuedNum++;
-                var th = new Thread(unused => Search(num, session));
-                th.Start();
+            if (HighestBitrateTrack == null)
+            {
+//Youtube
+                EditList("Queued", Result.PassedFileName, Result.PassedNum, 1);
+                YoutubeNum++;
+                TotalQuedNum++;
+                var Th = new Thread(Unused => Search(Num, Session));
+                Th.Start();
             }
             else
-            {//MP3Clan
-                songArray[session][num].PassedTrack = highestBitrateTrack;
-                EditList("Queued", result.PassedFileName, result.PassedNum, 1);
-                _mp3ClanNum++;
-                _totalQuedNum++;
+            {
+//MP3Clan
+                SongArray[Session][Num].PassedTrack = HighestBitrateTrack;
+                EditList("Queued", Result.PassedFileName, Result.PassedNum, 1);
+                Mp3ClanNum++;
+                TotalQuedNum++;
 
-                var th = new Thread(unused => StartDownloadMp3Clan(num, session));
-                th.Start();
+                var Th = new Thread(Unused => StartDownloadMp3Clan(Num, Session));
+                Th.Start();
             }
         }
 
-        public async void Search(int num, int session, int retry = 0, string videoID = null)
+        public async void Search(int Num, int Session, int Retry = 0, string VideoId = null)
         {
-            PassArguments result = songArray[session][num];
+            PassArguments Result = SongArray[Session][Num];
 
-            while (_running >= maxRunning)
+            while (Running >= MaxRunning)
             {
                 Thread.Sleep(500);
             }
-            _totalQuedNum--;
-            _running++;
-            EditList("Loading...", result.PassedFileName, result.PassedNum, 0);
+            TotalQuedNum--;
+            Running++;
+            EditList("Loading...", Result.PassedFileName, Result.PassedNum, 0);
 
-            string url = "";
-            var youtubeService = new YouTubeService(new BaseClientService.Initializer()
+            string Url = String.Empty;
+            var YoutubeService = new YouTubeService(new BaseClientService.Initializer()
             {
                 ApiKey = ApiKey,
-                ApplicationName = this.GetType().ToString()
+                ApplicationName = GetType().ToString()
             });
 
-            var searchListRequest = youtubeService.Search.List("snippet");
+            var SearchListRequest = YoutubeService.Search.List("snippet");
 
-            if (retry == 0)
+            switch (Retry)
             {
-                searchListRequest.Q = result.PassedFileName;
-            }
-            else if (retry == 1)
-            {
-                string newName = null;
-                try
+                case 0:
+                    SearchListRequest.Q = Result.PassedFileName;
+                    break;
+                case 1:
                 {
-                    newName = result.PassedSong.Substring(0, result.PassedSong.IndexOf("-")) + " - " + result.PassedArtist;
-                }
-                catch (Exception ex)
-                {
-                    newName = result.PassedFileName;
-                }
-                searchListRequest.Q = newName;
-            }
-            else if (retry == 2)
-            {
-                string newName = null;
-                try
-                {
-                    newName = result.PassedSong.Substring(0, result.PassedSong.IndexOf("(")) + " - " + result.PassedArtist;
-                }
-                catch (Exception ex)
-                {
-                    newName = result.PassedFileName;
-                }
-                searchListRequest.Q = newName;
-            }
-            else if (retry == 3)
-            {
-                string newName = null;
-                try
-                {
-                    newName = result.PassedSong.Substring(0, result.PassedSong.IndexOf("/")) + " - " + result.PassedArtist;
-                }
-                catch (Exception ex)
-                {
-                    newName = result.PassedFileName;
-                }
-                searchListRequest.Q = newName;
-            }
-            else if (retry == 4)
-            {
-                searchListRequest.Q = result.PassedFileName;
-            }
-            searchListRequest.MaxResults = 5;
-            searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Relevance;
-
-            var searchListResponse = await searchListRequest.ExecuteAsync();
-            List<string> videos = new List<string>();
-
-            string[] excludeStrings = { "live", "cover" };
-            string[] includeStrings = { "hd", "official" };
-            string[] includeChannelStrings = { "vevo" };
-            double highpersentage = 99999999.0;
-
-            for (int i = 0; i < excludeStrings.Length; i++)
-            {
-                if (result.PassedFileName.ToLower().Contains(excludeStrings[i]))
-                {
-                    excludeStrings = excludeStrings.Where(w => w != excludeStrings[i]).ToArray();
-                }
-            }
-
-            foreach (var word in excludeStrings)
-            {
-                if ((result.PassedFileName).ToLower().Contains(word))
-                {
-                    excludeStrings = excludeStrings.Where(str => str != word).ToArray();
-                }
-            }
-
-            bool keepgoing = true;
-            foreach (var searchResult in searchListResponse.Items)
-            {
-                if (keepgoing)
-                {
-                    if (searchResult.Id.VideoId != null && "https://www.youtube.com/watch?v=" + searchResult.Id.VideoId != videoID)
+                    string NewName;
+                    try
                     {
-                        if (retry == 4)
+                        NewName =
+                            Result.PassedSong.Substring(0, Result.PassedSong.IndexOf("-", StringComparison.Ordinal)) +
+                            " - " + Result.PassedArtist;
+                    }
+                    catch (Exception)
+                    {
+                        NewName = Result.PassedFileName;
+                    }
+                    SearchListRequest.Q = NewName;
+                }
+                    break;
+                case 2:
+                {
+                    string NewName;
+                    try
+                    {
+                        NewName =
+                            Result.PassedSong.Substring(0, Result.PassedSong.IndexOf("(", StringComparison.Ordinal)) +
+                            " - " + Result.PassedArtist;
+                    }
+                    catch (Exception)
+                    {
+                        NewName = Result.PassedFileName;
+                    }
+                    SearchListRequest.Q = NewName;
+                }
+                    break;
+                case 3:
+                {
+                    string NewName;
+                    try
+                    {
+                        NewName =
+                            Result.PassedSong.Substring(0, Result.PassedSong.IndexOf("/", StringComparison.Ordinal)) +
+                            " - " + Result.PassedArtist;
+                    }
+                    catch (Exception)
+                    {
+                        NewName = Result.PassedFileName;
+                    }
+                    SearchListRequest.Q = NewName;
+                }
+                    break;
+                case 4:
+                    SearchListRequest.Q = Result.PassedFileName;
+                    break;
+            }
+            SearchListRequest.MaxResults = 5;
+            SearchListRequest.Order = SearchResource.ListRequest.OrderEnum.Relevance;
+
+            var SearchListResponse = await SearchListRequest.ExecuteAsync();
+            List<string> Videos = new List<string>();
+
+            string[] ExcludeStrings = {"live", "cover"};
+            string[] IncludeStrings = {"hd", "official"};
+            string[] IncludeChannelStrings = {"vevo"};
+            double Highpersentage = 99999999.0;
+
+            for (int I = 0; I < ExcludeStrings.Length; I++)
+            {
+                if (Result.PassedFileName.ToLower().Contains(ExcludeStrings[I]))
+                {
+                    ExcludeStrings = ExcludeStrings.Where(W => W != ExcludeStrings[I]).ToArray();
+                }
+            }
+
+            foreach (var Word in ExcludeStrings.Where(Word => (Result.PassedFileName).ToLower().Contains(Word)))
+            {
+                ExcludeStrings = ExcludeStrings.Where(Str => Str != Word).ToArray();
+            }
+
+            bool Keepgoing = true;
+            foreach (var SearchResult in SearchListResponse.Items)
+            {
+                if (!Keepgoing) continue;
+                if (SearchResult.Id.VideoId == null ||
+                    "https://www.youtube.com/watch?v=" + SearchResult.Id.VideoId == VideoId) continue;
+
+                if (Retry == 4)
+                {
+                    Log("[Infomation x13] Downloaded song may be incorrect for " + Result.PassedFileName);
+                    Videos.Add(String.Format("{0} ({1})", SearchResult.Snippet.Title, SearchResult.Id.VideoId));
+                    Url = "https://www.youtube.com/watch?v=" + SearchResult.Id.VideoId;
+                    break;
+                }
+                if (ExcludeStrings.Any(SearchResult.Snippet.Title.ToLower().Contains) ||
+                    ExcludeStrings.Any(SearchResult.Snippet.Description.ToLower().Contains))
+                {
+//                        MessageBox.Show("ERROR IT CONTAINS BAD STUFF");
+                }
+                else
+                {
+                    var SearchListRequest2 = YoutubeService.Videos.List("contentDetails");
+                    SearchListRequest2.Id = SearchResult.Id.VideoId;
+                    var SearchListResponse2 = await SearchListRequest2.ExecuteAsync();
+
+                    foreach (var SearchResult2 in SearchListResponse2.Items)
+                    {
+                        string DurationTimeSpan = SearchResult2.ContentDetails.Duration;
+                        TimeSpan YouTubeDuration = XmlConvert.ToTimeSpan(DurationTimeSpan);
+                        double DurationMs = (YouTubeDuration).TotalMilliseconds;
+                        double Persentage = (DurationMs/Result.PassedLengthMs)*100;
+
+                        if (!(Persentage >= 90) || !(Persentage <= 110)) continue;
+                        double Number = Math.Abs(DurationMs - Result.PassedLengthMs);
+                        if (Number < Highpersentage)
                         {
-                            Log("[Infomation x13] Downloaded song may be incorrect for " + result.PassedFileName);
-                            videos.Add(String.Format("{0} ({1})", searchResult.Snippet.Title, searchResult.Id.VideoId));
-                            url = "https://www.youtube.com/watch?v=" + searchResult.Id.VideoId;
-                            keepgoing = false;
+//                                        Log(string.Format("{0:0.00}", persentage) + "% from the original and number is " + number + " | " + searchResult.Id.VideoId);
+                            Videos.Add(String.Format("{0} ({1})", SearchResult.Snippet.Title, SearchResult.Id.VideoId));
+                            Url = "https://www.youtube.com/watch?v=" + SearchResult.Id.VideoId;
+                            Highpersentage = Number;
+                        }
+
+                        if (IncludeChannelStrings.Any(SearchResult.Snippet.ChannelTitle.ToLower().Contains) ||
+                            SearchResult.Snippet.ChannelTitle.ToLower()
+                                .Contains(Result.PassedArtist.Replace(" ", "").ToLower()))
+                        {
+//                                        Log("using Official | " + searchResult.Id.VideoId);
+                            Videos.Add(String.Format("{0} ({1})", SearchResult.Snippet.Title, SearchResult.Id.VideoId));
+                            Url = "https://www.youtube.com/watch?v=" + SearchResult.Id.VideoId;
+                            Keepgoing = false;
                             break;
                         }
-                        if (excludeStrings.Any(searchResult.Snippet.Title.ToLower().Contains) ||
-                            excludeStrings.Any(searchResult.Snippet.Description.ToLower().Contains))
-                        {
-//                        MessageBox.Show("ERROR IT CONTAINS BAD STUFF");
-                        }
-                        else
-                        {
-                            var searchListRequest2 = youtubeService.Videos.List("contentDetails");
-                            searchListRequest2.Id = searchResult.Id.VideoId;
-                            var searchListResponse2 = await searchListRequest2.ExecuteAsync();
 
-                            foreach (var searchResult2 in searchListResponse2.Items)
-                            {
-                                string durationTimeSpan = searchResult2.ContentDetails.Duration;
-                                TimeSpan youTubeDuration = XmlConvert.ToTimeSpan(durationTimeSpan);
-                                double durationMs = (youTubeDuration).TotalMilliseconds;
-                                double persentage = (durationMs/result.PassedLengthMs)*100;
-
-                                if (persentage >= 90 && persentage <= 110)
-                                {
-                                    double number = Math.Abs(durationMs - result.PassedLengthMs);
-                                    if (number < highpersentage)
-                                    {
-//                                        Log(string.Format("{0:0.00}", persentage) + "% from the original and number is " + number + " | " + searchResult.Id.VideoId);
-                                        videos.Add(String.Format("{0} ({1})", searchResult.Snippet.Title, searchResult.Id.VideoId));
-                                        url = "https://www.youtube.com/watch?v=" + searchResult.Id.VideoId;
-                                        highpersentage = number;
-                                    }
-
-                                    if (includeChannelStrings.Any(searchResult.Snippet.ChannelTitle.ToLower().Contains) || searchResult.Snippet.ChannelTitle.ToLower().Contains(result.PassedArtist.Replace(" ","").ToLower()))
-                                    {
-//                                        Log("using Official | " + searchResult.Id.VideoId);
-                                        videos.Add(String.Format("{0} ({1})", searchResult.Snippet.Title, searchResult.Id.VideoId));
-                                        url = "https://www.youtube.com/watch?v=" + searchResult.Id.VideoId;
-                                        keepgoing = false;
-                                        break;
-                                    }
-
-                                    if (includeStrings.Any(searchResult.Snippet.Description.ToLower().Contains) || includeStrings.Any(searchResult.Snippet.Title.ToLower().Contains))
-                                    {
+                        if (!IncludeStrings.Any(SearchResult.Snippet.Description.ToLower().Contains) &&
+                            !IncludeStrings.Any(SearchResult.Snippet.Title.ToLower().Contains)) continue;
 //                                        Log("using Original " + string.Format("{0:0.00}", persentage) + "% from the original| " + searchResult.Id.VideoId);
-                                        videos.Add(String.Format("{0} ({1})", searchResult.Snippet.Title, searchResult.Id.VideoId));
-                                        url = "https://www.youtube.com/watch?v=" + searchResult.Id.VideoId;
-                                        keepgoing = false;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        Videos.Add(String.Format("{0} ({1})", SearchResult.Snippet.Title, SearchResult.Id.VideoId));
+                        Url = "https://www.youtube.com/watch?v=" + SearchResult.Id.VideoId;
+                        Keepgoing = false;
+                        break;
                     }
                 }
             }
 
-            if (url != "")
+            if (Url != String.Empty)
             {
-                songArray[session][num].PassedURL = url;
+                SongArray[Session][Num].PassedURL = Url;
             }
             else
             {
-                if (retry == 0)
+                switch (Retry)
                 {
-                    _running--;
-                    _totalQuedNum++;
-                    if (_running < 0)
-                    {
-                        _running = 0;
-                    }
-                    Search(num, session, 1);
-                    return;
+                    case 0:
+                        Running--;
+                        TotalQuedNum++;
+                        if (Running < 0)
+                        {
+                            Running = 0;
+                        }
+                        Search(Num, Session, 1);
+                        return;
+                    case 1:
+                        Running--;
+                        TotalQuedNum++;
+                        if (Running < 0)
+                        {
+                            Running = 0;
+                        }
+                        Search(Num, Session, 2);
+                        return;
+                    case 2:
+                        Running--;
+                        TotalQuedNum++;
+                        if (Running < 0)
+                        {
+                            Running = 0;
+                        }
+                        Search(Num, Session, 3);
+                        return;
+                    case 3:
+                        Running--;
+                        TotalQuedNum++;
+                        if (Running < 0)
+                        {
+                            Running = 0;
+                        }
+                        Search(Num, Session, 4);
+                        return;
+                    case 4:
+                        Done(Result.PassedFileName, Result.PassedNum, "NotFound", 5); //Youtube not found
+                        Log("[Error x9] Video not found for: " + Result.PassedFileName, true);
+                        Running--;
+                        if (Running < 0)
+                        {
+                            Running = 0;
+                        }
+                        return;
                 }
-                if (retry == 1)
+                Log("[Error x10] " + Result.PassedFileName, true);
+                Running--;
+                TotalQuedNum++;
+                if (Running < 0)
                 {
-                    _running--;
-                    _totalQuedNum++;
-                    if (_running < 0)
-                    {
-                        _running = 0;
-                    }
-                    Search(num, session, 2);
-                    return;
-                }
-                if (retry == 2)
-                {
-                    _running--;
-                    _totalQuedNum++;
-                    if (_running < 0)
-                    {
-                        _running = 0;
-                    }
-                    Search(num, session, 3);
-                    return;
-                }
-                if (retry == 3)
-                {
-                    _running--;
-                    _totalQuedNum++;
-                    if (_running < 0)
-                    {
-                        _running = 0;
-                    }
-                    Search(num, session, 4);
-                    return;
-                }
-                if (retry == 4)
-                {
-                    Done(result.PassedFileName, result.PassedNum, "NotFound", 5);//Youtube not found
-                    Log("[Error x9] Video not found for: " + result.PassedFileName, true);
-                    _running--;
-                    if (_running < 0)
-                    {
-                        _running = 0;
-                    }
-                    return;
-                }
-                Log("[Error x10] " + result.PassedFileName, true);
-                _running--;
-                _totalQuedNum++;
-                if (_running < 0)
-                {
-                    _running = 0;
+                    Running = 0;
                 }
                 return;
             }
 
-            songArray[session][num].YouTubeVideoQuality = youTubeDownloader.GetYouTubeVideoUrls(result.PassedURL);
-            if (songArray[session][num].YouTubeVideoQuality == null)
+            SongArray[Session][Num].YouTubeVideoQuality = YouTubeDownloader.GetYouTubeVideoUrls(Result.PassedURL);
+            if (SongArray[Session][Num].YouTubeVideoQuality == null)
             {
 //                Log("Cant download " + result.passedFileName + " because of age restriction on video");
-                _running--;
-                if (_running < 0)
+                Running--;
+                if (Running < 0)
                 {
-                    _running = 0;
+                    Running = 0;
                 }
-                _totalQuedNum++;
-                Search(num, session, 0, url);
+                TotalQuedNum++;
+                Search(Num, Session, 0, Url);
                 return;
             }
-            YouTubeDownload(num, session);
+            YouTubeDownload(Num, Session);
         }
 
-        void YouTubeDownload(int num, int session)
+        private void YouTubeDownload(int Num, int Session)
         {
-            PassArguments result = songArray[session][num];
+            PassArguments Result = SongArray[Session][Num];
 //            while (true)
 //            {
+            try
+            {
+                List<YouTubeVideoQuality> Urls = Result.YouTubeVideoQuality;
+                YouTubeVideoQuality HighestQual = new YouTubeVideoQuality();
+
+                if (Urls.Any(url => url.Extention == "mp4"))
+                {
+                    HighestQual = Urls[0];
+                }
+                string Url = String.Empty;
+                string SaveTo = String.Empty;
                 try
                 {
-                    List<YouTubeVideoQuality> urls = result.YouTubeVideoQuality;
-                    YouTubeVideoQuality highestQual = new YouTubeVideoQuality();
-
-                    foreach (var url in urls)
-                    {
-                        if (url.Extention == "mp4")
-                        {
-                            highestQual = urls[0];
-                            break;
-                        }
-                    }
-                    string Url = "";
-                    string saveTo = "";
-                    try
-                    {
-                        YouTubeVideoQuality tempItem = highestQual;
-                        Url = tempItem.DownloadUrl;
-                        saveTo = EscapeFilename(result.PassedFileName) + ".mp4";
-                    }
-                    catch (Exception ex)
-                    {
-                        Log("[Error x11] " + ex.InnerException, true);
-                    }
-                    if (result.PassedFileName == null || result.PassedNum == null)
-                    {
-                        MessageBox.Show("Somthing null");
-                    }
-                    EditList("Downloading...", result.PassedFileName, result.PassedNum, 2);
-                    var folder = Path.GetDirectoryName(_tempDir + saveTo);
-                    string file = Path.GetFileName(_tempDir + saveTo);
-
-                    var client = new WebClient();
-                    Uri address = new Uri(Url);
-                    client.DownloadFile(address, folder + "\\" + file);
-                    EditList("Converting...", result.PassedFileName, result.PassedNum, 3);
-                    StartConvert(result.PassedFileName);
-                    MusicTags(num, session);
-                    _youtubeDownloadedNum++;
-                    Done(result.PassedFileName, num);
-                    _running--;
-                    if (_running < 0)
-                    {
-                        _running = 0;
-                    }
-//                    break;
+                    YouTubeVideoQuality TempItem = HighestQual;
+                    Url = TempItem.DownloadUrl;
+                    SaveTo = EscapeFilename(Result.PassedFileName) + ".mp4";
                 }
-                catch (Exception ex)
+                catch (Exception Ex)
                 {
-                    Log("[Error x12] " + "|" + ex.Message + "| " + ex.InnerException + " | " + result.PassedFileName, true);
+                    Log("[Error x11] " + Ex.InnerException, true);
                 }
+                if (Result.PassedFileName == null)
+                {
+                    MessageBox.Show(@"Somthing null");
+                }
+                EditList("Downloading...", Result.PassedFileName, Result.PassedNum, 2);
+                var Folder = Path.GetDirectoryName(TempDir + SaveTo);
+                string file = Path.GetFileName(TempDir + SaveTo);
+
+                var Client = new WebClient();
+                Uri Address = new Uri(Url);
+                Client.DownloadFile(Address, Folder + "\\" + file);
+                EditList("Converting...", Result.PassedFileName, Result.PassedNum, 3);
+                StartConvert(Result.PassedFileName);
+                MusicTags(Num, Session);
+                YoutubeDownloadedNum++;
+                Done(Result.PassedFileName, Num);
+                Running--;
+                if (Running < 0)
+                {
+                    Running = 0;
+                }
+//                    break;
+            }
+            catch (Exception Ex)
+            {
+                Log("[Error x12] " + "|" + Ex.Message + "| " + Ex.InnerException + " | " + Result.PassedFileName, true);
+            }
 //            }
         }
 
 
-        void StartConvert(string songName)
+        private void StartConvert(string SongName)
         {
-//            string output = "";
-            Process _process = new Process();
-            _process.StartInfo.UseShellExecute = false;
-//            _process.StartInfo.RedirectStandardInput = true;
+//            string output = String.Empty;
+            Process Process = new Process
+            {
+                StartInfo =
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    FileName = FfmpegPath,
+                    Arguments =
+                        " -i \"" + TempDir + EscapeFilename(SongName) + ".mp4\" -vn -f mp3 -ab 320k \"" + Dir +
+                        EscapeFilename(SongName) + ".mp3\""
+                }
+            };
+            //            _process.StartInfo.RedirectStandardInput = true;
 //            _process.StartInfo.RedirectStandardOutput = true;
 //            _process.StartInfo.RedirectStandardError = true;
-            _process.StartInfo.CreateNoWindow = true;
-            _process.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-//            _process.StartInfo.FileName = "ffmpeg";
-            _process.StartInfo.FileName = _ffmpegPath;
+            //            _process.StartInfo.FileName = "ffmpeg";
             //            _process.StartInfo.Arguments = " -i \"" + SongName + ".mp4\" -vn -f mp3 -ab 192k \"" + SongName + ".mp3\"";
-            _process.StartInfo.Arguments = " -i \"" + _tempDir + EscapeFilename(songName) + ".mp4\" -vn -f mp3 -ab 320k \"" + _dir + EscapeFilename(songName) + ".mp3\"";
-            _process.Start();
+            Process.Start();
 //            _process.StandardOutput.ReadToEnd();
 //            output = _process.StandardError.ReadToEnd();
-            _process.WaitForExit();
-            if (File.Exists(_tempDir + EscapeFilename(songName) + ".mp4"))
+            Process.WaitForExit();
+            if (File.Exists(TempDir + EscapeFilename(SongName) + ".mp4"))
             {
-                File.Delete(_tempDir + EscapeFilename(songName) + ".mp4");
+                File.Delete(TempDir + EscapeFilename(SongName) + ".mp4");
             }
         }
 
-        private void StartDownloadMp3Clan(int num, int session)
+        private void StartDownloadMp3Clan(int Num, int Session)
         {
-            PassArguments result = songArray[session][num];
+            PassArguments Result = SongArray[Session][Num];
 
-            while (_running >= maxRunning)
+            while (Running >= MaxRunning)
             {
                 Thread.Sleep(500);
             }
-            _totalQuedNum--;
-            _running++;
-            _mp3ClanDownloadedNum++;
+            TotalQuedNum--;
+            Running++;
+            Mp3ClanDownloadedNum++;
 
-            EditList("Downloading...", result.PassedFileName, result.PassedNum, 2);
+            EditList("Downloading...", Result.PassedFileName, Result.PassedNum, 2);
 
-            Uri downloadUrl = null;
-            int errorTimesX6 = 0;
+            int ErrorTimesX6 = 0;
             while (true)
             {
                 try
                 {
-                    downloadUrl = new Uri(result.PassedTrack.Mp3ClanUrl);
-                    var fileName = _dir + "\\" + EscapeFilename(result.PassedFileName) + ".mp3";
+                    var DownloadUrl = new Uri(Result.PassedTrack.Mp3ClanUrl);
+                    var FileName = Dir + "\\" + EscapeFilename(Result.PassedFileName) + ".mp3";
 
-                    int errorTimes = 0;
+                    int ErrorTimes = 0;
                     while (true)
                     {
-                        using (var client = new WebClient())
+                        using (var Client = new WebClient())
                         {
-                            client.DownloadFile(downloadUrl, fileName);
-                            client.Dispose();
+                            Client.DownloadFile(DownloadUrl, FileName);
+                            Client.Dispose();
                         }
 
-                        long fileSize = new FileInfo(fileName).Length;
-                        if (fileSize < 1000)    //Possible improvement. get file size from online fore download and check that its a 5% acc to approve the download
+                        long FileSize = new FileInfo(FileName).Length;
+                        if (FileSize < 1000)
+                            //Possible improvement. get file size from online fore download and check that its a 5% acc to approve the download
                         {
-                            errorTimes++;
-                            if (errorTimes >= 3)
+                            ErrorTimes++;
+                            if (ErrorTimes >= 3)
                             {
-                                Log("[Infomation: x5] " + result.PassedFileName + " failed, re-downloading");
+                                Log("[Infomation: x5] " + Result.PassedFileName + " failed, re-downloading");
                             }
                         }
                         else
@@ -864,105 +839,102 @@ namespace SpotDown_V2
                     }
                     break;
                 }
-                catch (Exception ex)
+                catch (Exception Ex)
                 {
-                    errorTimesX6++;
-                    if (errorTimesX6 >= 3)
-                    {
-                        Log("[Infomation: x6] " + ex.Message + " | " + ex.InnerException + " | " + result.PassedFileName);
-                        errorTimesX6 = 0;
-                        Thread.Sleep(500);
-                    }
+                    ErrorTimesX6++;
+                    if (ErrorTimesX6 < 3) continue;
+                    Log("[Infomation: x6] " + Ex.Message + " | " + Ex.InnerException + " | " + Result.PassedFileName);
+                    ErrorTimesX6 = 0;
+                    Thread.Sleep(500);
                 }
             }
-            MusicTags(num, session);
-            Done(result.PassedFileName, result.PassedNum);
-            _running--;
-            if (_running < 0)
+            MusicTags(Num, Session);
+            Done(Result.PassedFileName, Result.PassedNum);
+            Running--;
+            if (Running < 0)
             {
-                _running = 0;
+                Running = 0;
             }
         }
 
-        public void MusicTags(int num, int session)
+        public void MusicTags(int Num, int Session)
         {
-            PassArguments result = songArray[session][num];
+            PassArguments Result = SongArray[Session][Num];
             try
             {
                 //===edit tags====
-                TagLib.File f = TagLib.File.Create(_dir + EscapeFilename(result.PassedFileName) + ".mp3");
-                f.Tag.Clear();
-                f.Tag.AlbumArtists = new string[1] { result.PassedArtist };
-                f.Tag.Performers = new string[1] { result.PassedArtist };
-                f.Tag.Title = result.PassedSong;
-                f.Tag.Album = result.PassedAlbum;
+                TagLib.File F = TagLib.File.Create(Dir + EscapeFilename(Result.PassedFileName) + ".mp3");
+                F.Tag.Clear();
+                F.Tag.AlbumArtists = new[] {Result.PassedArtist};
+                F.Tag.Performers = new[] {Result.PassedArtist};
+                F.Tag.Title = Result.PassedSong;
+                F.Tag.Album = Result.PassedAlbum;
 //                //                Log(result.passedFileName + " and " + result.passedAlbumID);
-                Image currentImage = GetAlbumArt(num, session);
-                Picture pic = new Picture();
-                pic.Type = PictureType.FrontCover;
-                pic.MimeType = System.Net.Mime.MediaTypeNames.Image.Jpeg;
-                pic.Description = "Cover";
-                MemoryStream ms = new MemoryStream();
-                currentImage.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg); // <-- Error doesn't occur anymore
-                ms.Position = 0;
-                pic.Data = ByteVector.FromStream(ms);
-                f.Tag.Pictures = new IPicture[1] { pic };
-                f.Save();
-                ms.Close();
+                Image CurrentImage = GetAlbumArt(Num, Session);
+                Picture Pic = new Picture
+                {
+                    Type = PictureType.FrontCover,
+                    MimeType = System.Net.Mime.MediaTypeNames.Image.Jpeg,
+                    Description = "Cover"
+                };
+                MemoryStream Ms = new MemoryStream();
+                CurrentImage.Save(Ms, System.Drawing.Imaging.ImageFormat.Jpeg); // <-- Error doesn't occur anymore
+                Ms.Position = 0;
+                Pic.Data = ByteVector.FromStream(Ms);
+                F.Tag.Pictures = new IPicture[] {Pic};
+                F.Save();
+                Ms.Close();
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                Log("[Error: x7] " + ex.Message + Environment.NewLine + Environment.NewLine + result.PassedFileName, true);
+                Log("[Error: x7] " + Ex.Message + Environment.NewLine + Environment.NewLine + Result.PassedFileName,
+                    true);
             }
         }
 
-        Bitmap GetAlbumArt(int num, int session)
+        private Bitmap GetAlbumArt(int Num, int Session)
         {
-            PassArguments result = songArray[session][num];
-            Bitmap bitmap2;
+            PassArguments Result = SongArray[Session][Num];
+            Bitmap Bitmap2 = null;
             try
             {
-                WebRequest request = WebRequest.Create(result.PassedimageURL);
-                WebResponse response = request.GetResponse();
-                Stream responseStream = response.GetResponseStream();
-                bitmap2 = new Bitmap(responseStream);
+                WebRequest Request = WebRequest.Create(Result.PassedimageURL);
+                WebResponse Response = Request.GetResponse();
+                Stream ResponseStream = Response.GetResponseStream();
+                if (ResponseStream != null) Bitmap2 = new Bitmap(ResponseStream);
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                Log("[Error: x8] " + ex.Message, true);
-                bitmap2 = null;
+                Log("[Error: x8] " + Ex.Message, true);
+                Bitmap2 = null;
             }
 
-            return bitmap2;
+            return Bitmap2;
         }
 
-        public string GetKbps(string s)
+        public string GetKbps(string S)
         {
-            int l = s.IndexOf(" kbps");
-            if (l > 0)
-            {
-                return s.Substring(0, l);
-            }
-            return "";
+            int L = S.IndexOf(" kbps", StringComparison.Ordinal);
+            return L > 0 ? S.Substring(0, L) : "";
         }
 
-        public double GetLength(string s)
+        public double GetLength(string S)
         {
-            int pFrom = s.IndexOf("<br>") + "<br>".Length;
-            int pTo = s.IndexOf(" min");
+            int PFrom = S.IndexOf("<br>", StringComparison.Ordinal) + "<br>".Length;
+            int PTo = S.IndexOf(" min", StringComparison.Ordinal);
 
-            string result = s.Substring(pFrom, pTo - pFrom).Replace(":", ".");
-            double songLength = double.Parse(result, CultureInfo.InvariantCulture);
-            return songLength;
+            string Result = S.Substring(PFrom, PTo - PFrom).Replace(":", ".");
+            double SongLength = double.Parse(Result, CultureInfo.InvariantCulture);
+            return SongLength;
         }
 
-        private void Done(string passedFileName, int passedNum, string message = "Done!", int num = 4)
+        private void Done(string PassedFileName, int PassedNum, string Message = "Done!", int Num = 4)
         {
-            EditList(message, passedFileName, passedNum, num);
-            _totalFinished++;
+            EditList(Message, PassedFileName, PassedNum, Num);
+            TotalFinished++;
 
-            newProgressBar1.Maximum = _songs;
-            newProgressBar1.Value = _totalFinished;
+            newProgressBar1.Maximum = Songs;
+            newProgressBar1.Value = TotalFinished;
             newProgressBar1.CustomText = newProgressBar1.Value + "/" + newProgressBar1.Maximum;
 //            double percent = ((TotalFinished - 1)/songs)*100;
 //            harrProgressBar1.FillDegree = (int)percent;
@@ -972,19 +944,20 @@ namespace SpotDown_V2
             }
         }
 
-        public double MillisecondsTimeSpanToHms(double s)
+        public double MillisecondsTimeSpanToHms(double S)
         {
-            s = TimeSpan.FromMilliseconds(s).TotalSeconds;
-            var h = Math.Floor(s / 3600); //Get whole hours
-            s -= h * 3600;
-            var m = Math.Floor(s / 60); //Get remaining minutes
-            s -= m * 60;
-            s = Math.Round(s);
-            string stringLength = (m + "." + s);
-            return double.Parse(stringLength, CultureInfo.InvariantCulture);
+            S = TimeSpan.FromMilliseconds(S).TotalSeconds;
+            var H = Math.Floor(S/3600); //Get whole hours
+            S -= H*3600;
+            var M = Math.Floor(S/60); //Get remaining minutes
+            S -= M*60;
+            S = Math.Round(S);
+            string StringLength = (M + "." + S);
+            return double.Parse(StringLength, CultureInfo.InvariantCulture);
         }
 
         private delegate void SetLabelVisibleDelegate(bool status);
+
         private void SetLabelVisible(bool status)
         {
             if (label3.InvokeRequired)
@@ -993,15 +966,15 @@ namespace SpotDown_V2
                 label3.Visible = status;
         }
 
-        public PassArguments GetSpotifyName(string query)//Uptaded to use new API
+        public PassArguments GetSpotifyName(string Query) //Uptaded to use new API
         {
-            string getData = null;
+            string GetData;
             while (true)
             {
                 try
                 {
-                    WebClient c = new WebClient();
-                    getData = c.DownloadString("https://api.spotify.com/v1/tracks/" + query);
+                    WebClient C = new WebClient();
+                    GetData = C.DownloadString("https://api.spotify.com/v1/tracks/" + Query);
                     break;
                 }
                 catch (Exception)
@@ -1009,109 +982,96 @@ namespace SpotDown_V2
                     Thread.Sleep(500);
                 }
             }
-            
-            JObject o = JObject.Parse(getData);
-            string name = o["name"].ToString();
-            string artist = o["artists"][0]["name"].ToString();
-            string albumId = o["artists"][0]["id"].ToString();
-            string album = o["album"]["name"].ToString();
-            string imageURL = o["album"]["images"][0]["url"].ToString();
-            double lengthMs = double.Parse(o["duration_ms"].ToString());
-            double length = MillisecondsTimeSpanToHms(double.Parse(o["duration_ms"].ToString()));
 
-            name = Encoding.UTF8.GetString(Encoding.Default.GetBytes(name));
-            artist = Encoding.UTF8.GetString(Encoding.Default.GetBytes(artist));
-            album = Encoding.UTF8.GetString(Encoding.Default.GetBytes(album));
+            JObject O = JObject.Parse(GetData);
+            string Title = O["name"].ToString();
+            string Artist = O["artists"][0]["name"].ToString();
+            string AlbumId = O["artists"][0]["id"].ToString();
+            string Album = O["album"]["name"].ToString();
+            string ImageUrl = O["album"]["images"][0]["url"].ToString();
+            double LengthMs = double.Parse(O["duration_ms"].ToString());
+            double Length = MillisecondsTimeSpanToHms(double.Parse(O["duration_ms"].ToString()));
 
-            PassArguments pass = new PassArguments
+            Title = Encoding.UTF8.GetString(Encoding.Default.GetBytes(Title));
+            Artist = Encoding.UTF8.GetString(Encoding.Default.GetBytes(Artist));
+            Album = Encoding.UTF8.GetString(Encoding.Default.GetBytes(Album));
+
+            PassArguments Pass = new PassArguments
             {
-                PassedSong = name,
-                PassedArtist = artist,
-                PassedAlbum = album,
-                PassedAlbumId = albumId,
-                PassedFileName = name + " - " + artist,
-                PassedLength = length,
-                PassedLengthMs = lengthMs,
-                PassedimageURL = imageURL
+                PassedSong = Title,
+                PassedArtist = Artist,
+                PassedAlbum = Album,
+                PassedAlbumId = AlbumId,
+                PassedFileName = Title + " - " + Artist,
+                PassedLength = Length,
+                PassedLengthMs = LengthMs,
+                PassedimageURL = ImageUrl
             };
-            return pass;
+            return Pass;
         }
 
-        string EscapeFilename(string name)
+        private static string EscapeFilename(string name)
         {
-            name = name.Replace("/", "_");
-            name = name.Replace("\\", "_");
-            name = name.Replace("<", "_");
-            name = name.Replace(">", "_");
-            name = name.Replace(":", "_");
-            name = name.Replace("\"", "_");
-            name = name.Replace("|", "_");
-            name = name.Replace("?", "_");
-            name = name.Replace("*", "_");
-            return name;
+            return Path.GetInvalidFileNameChars().Aggregate(name, (current, c) => current.Replace(c.ToString(), "_"));
         }
 
-        public void EditList(string message, string fileName, int number, int image)
+        public void EditList(string Message, string FileName, int Number, int Image)
         {
-            var data = new ListViewData {Message = message, FileName = fileName, Number = number, Image = image};
-            downloadData[number] = (data);
+            var Data = new ListViewData {Message = Message, FileName = FileName, Number = Number, Image = Image};
+            DownloadData[Number] = (Data);
         }
 
-        private void SongListUpdateTimer_Tick(object sender, EventArgs e)
+        private void SongListUpdateTimer_Tick(object Sender, EventArgs E)
         {
             SongListView.BeginUpdate();
-            foreach (var downloadInfo in downloadData)
+            foreach (var DownloadInfo in DownloadData.Where(DownloadInfo => DownloadInfo != null))
             {
-                if (downloadInfo != null)
+                string[] Row = {DownloadInfo.Message, DownloadInfo.FileName};
+                var ListViewItem = new ListViewItem(Row) {ImageIndex = DownloadInfo.Image};
+                if (SongListView.Items[DownloadInfo.Number] == null)
                 {
-                    string[] row = { downloadInfo.Message, downloadInfo.FileName };
-                    var listViewItem = new ListViewItem(row);
-                    listViewItem.ImageIndex = downloadInfo.Image;
-                    if (SongListView.Items[downloadInfo.Number] == null)
-                    {
-                        SongListView.Items.Add(listViewItem);
-                    }
-                    else
-                    {
-                        SongListView.Items[downloadInfo.Number] = (listViewItem);
-                    }
+                    SongListView.Items.Add(ListViewItem);
                 }
-               
+                else
+                {
+                    SongListView.Items[DownloadInfo.Number] = (ListViewItem);
+                }
             }
             SongListView.EndUpdate();
         }
 
-        private bool logStyle = false;
-        private void Button1_Click(object sender, EventArgs e)
+        private bool LogStyle;
+
+        private void Button1_Click(object Sender, EventArgs E)
         {
-            if (logStyle)
+            if (LogStyle)
             {
-                button1.Text = "Log >";
+                button1.Text = @"Log >";
                 Size = new Size(597, 448);
-                logStyle = false;
+                LogStyle = false;
             }
             else
             {
-                button1.Text = "Log <";
+                button1.Text = @"Log <";
                 Size = new Size(1245, 448);
-                logStyle = true;
+                LogStyle = true;
             }
         }
 
-        private void CheckBox1_CheckedChanged(object sender, EventArgs e)
+        private void CheckBox1_CheckedChanged(object Sender, EventArgs E)
         {
-            _debug = checkBox1.Checked;
+            Debug = checkBox1.Checked;
         }
 
-        private void LabelUpdateTimer_Tick(object sender, EventArgs e)
+        private void LabelUpdateTimer_Tick(object Sender, EventArgs E)
         {
-            label9.Text = _running.ToString();
-            label5.Text = _youtubeNum.ToString();
-            label4.Text = _mp3ClanNum.ToString();
-            label17.Text = _totalQuedNum.ToString();
-            label10.Text = _mp3ClanDownloadedNum.ToString();
-            label19.Text = _totalFinished.ToString();
-            label15.Text = _youtubeDownloadedNum.ToString();
+            label9.Text = Running.ToString();
+            label5.Text = YoutubeNum.ToString();
+            label4.Text = Mp3ClanNum.ToString();
+            label17.Text = TotalQuedNum.ToString();
+            label10.Text = Mp3ClanDownloadedNum.ToString();
+            label19.Text = TotalFinished.ToString();
+            label15.Text = YoutubeDownloadedNum.ToString();
         }
     }
 }
